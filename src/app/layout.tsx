@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google';
 import { CssBaseline } from '@mui/material';
 import { CustomThemeProvider } from '@/theme/ThemeProvider';
 import './globals.css';
-
+import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
