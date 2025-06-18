@@ -41,6 +41,7 @@ export default function RootLayout({
         <CustomThemeProvider>
           <CssBaseline />
           {children}
+          <Analytics />
         </CustomThemeProvider>
       </body>
     </html>
