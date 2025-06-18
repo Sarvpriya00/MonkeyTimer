@@ -1,103 +1,206 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useEffect, useRef, useState } from 'react';
+import { Box, Container } from '@mui/material';
+import Header from '@/components/Header';
+import Timer from '@/components/Timer';
+import TimerControls from '@/components/TimerControls';
+import SettingsPanel from '@/components/SettingsPanel';
+
+// Timer settings interface (mirrors SettingsPanel)
+interface TimerSettings {
+  workDuration: number; // minutes
+  shortBreak: number;   // minutes
+  longBreak: number;    // minutes
+  longBreakInterval: number;
+  autoStartBreaks: boolean;
+  autoStartPomodoros: boolean;
+  notifications: boolean;
+  sound: string; // simple string id for now
+  volume: number; // 0–100
+}
+
+type TimerMode = 'work' | 'shortBreak' | 'longBreak';
+
+const DEFAULT_SETTINGS: TimerSettings = {
+  workDuration: 20,      // user requested default 20-minute focus
+  shortBreak: 5,
+  longBreak: 15,
+  longBreakInterval: 4,
+  autoStartBreaks: true,
+  autoStartPomodoros: true,
+  notifications: true,
+  sound: 'bell',
+  volume: 70,
+};
+
+export default function HomePage() {
+  // ----- State -----
+  const [settings, setSettings] = useState<TimerSettings>(() => {
+    try {
+      const saved = localStorage.getItem('pomodoro:settings');
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
+
+  const [mode, setMode] = useState<TimerMode>('work');
+  const [isRunning, setIsRunning] = useState(false);
+  const [completedWorkSessions, setCompletedWorkSessions] = useState(0);
+  const [timerKey, setTimerKey] = useState(0); // handy to force remount
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ----- Helpers -----
+  const getInitialTime = (): number => {
+    switch (mode) {
+      case 'work':
+        return settings.workDuration * 60;
+      case 'shortBreak':
+        return settings.shortBreak * 60;
+      case 'longBreak':
+        return settings.longBreak * 60;
+      default:
+        return 0;
+    }
+  };
+
+  const handleStart = () => setIsRunning(true);
+  const handlePause = () => setIsRunning(false);
+  const handleReset = () => {
+    setIsRunning(false);
+    setTimerKey((k) => k + 1);
+  };
+  const handleTimerComplete = () => {
+    // Always stop the timer when it completes
+    setIsRunning(false);
+
+    // Play notification sound if enabled
+    if (audioRef.current) {
+      try {
+        // Force reload the audio element to ensure it picks up any source changes
+        const audio = audioRef.current;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = settings.volume / 100;
+        
+        // Create a new audio context to handle autoplay restrictions
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.warn('Audio playback failed:', error);
+            // Fallback: Try playing again with user interaction
+            document.addEventListener('click', function onClick() {
+              audio.play().catch(e => console.warn('Fallback play failed:', e));
+              document.removeEventListener('click', onClick);
+            }, { once: true });
+          });
+        }
+      } catch (error) {
+        console.error('Error playing sound:', error);
+      }
+    }
+
+    // Show desktop notification if enabled and permission granted
+    if (settings.notifications && Notification.permission === 'granted') {
+      const nextMode = mode === 'work' 
+        ? (completedWorkSessions + 1) % settings.longBreakInterval === 0 ? 'longBreak' : 'shortBreak'
+        : 'work';
+      
+      const modeNames = {
+        work: 'Work',
+        shortBreak: 'Short Break',
+        longBreak: 'Long Break'
+      };
+
+      new Notification('Timer Complete', {
+        body: `Time for ${modeNames[nextMode]}. Click to start.`,
+        icon: '/favicon.ico',
+        requireInteraction: true
+      });
+    } else if (settings.notifications && Notification.permission !== 'denied') {
+      // Request notification permission if not already determined
+      Notification.requestPermission();
+    }
+
+    // Update mode and session count without auto-starting
+    if (mode === 'work') {
+      const newCount = completedWorkSessions + 1;
+      setCompletedWorkSessions(newCount);
+      const isLongBreak = newCount % settings.longBreakInterval === 0;
+      setMode(isLongBreak ? 'longBreak' : 'shortBreak');
+    } else {
+      setMode('work');
+    }
+  };
+
+  // Persist settings when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('pomodoro:settings', JSON.stringify(settings));
+    } catch {/* ignore */}
+  }, [settings]);
+
+  // When mode or settings change, reset timerKey to restart timer with new initialTime
+  useEffect(() => {
+    setTimerKey((k) => k + 1);
+  }, [mode, settings]);
+
+  // ----- Settings panel -----
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const openSettings = () => setIsSettingsOpen(true);
+  const closeSettings = () => setIsSettingsOpen(false);
+  const saveSettings = (s: TimerSettings) => setSettings(s);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <Header />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <Container maxWidth="md" sx={{ mt: 6, px: 2, textAlign: 'center' }}>
+        <Timer
+          key={timerKey}
+          initialTime={getInitialTime()}
+          mode={mode}
+          isRunning={isRunning}
+          onComplete={handleTimerComplete}
+        />
+
+        <TimerControls
+          isRunning={isRunning}
+          onStart={handleStart}
+          onPause={handlePause}
+          onReset={handleReset}
+          onSettingsOpen={openSettings}
+        />
+      </Container>
+
+      {/* Settings dialog */}
+      <SettingsPanel
+        open={isSettingsOpen}
+        onClose={closeSettings}
+        onSave={saveSettings}
+        initialSettings={settings}
+      />
+
+      {/* Hidden audio element for notification sounds */}
+      <audio
+        ref={audioRef}
+        src={`/sounds/bell.mp3`}
+        preload="auto"
+        onError={(e) => console.error('Audio error:', e)}
+        onCanPlayThrough={() => console.log('Audio ready to play')}
+        onPlay={() => console.log('Audio started playing')}
+        onPause={() => console.log('Audio paused')}
+        onEnded={() => console.log('Audio finished playing')}
+        onLoadStart={() => console.log('Audio loading started')}
+        onLoadedData={() => console.log('Audio loaded')}
+        onStalled={() => console.warn('Audio stalled')}
+        onSuspend={() => console.log('Audio loading suspended')}
+        onAbort={() => console.warn('Audio loading aborted')}
+        onEmptied={() => console.warn('Audio emptied')}
+      />
+    </>
   );
 }
