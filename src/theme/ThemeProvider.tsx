@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { ThemeProvider as MuiThemeProvider, createTheme, Theme } from '@mui/material/styles';
-import { PaletteMode } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider, Theme } from '@mui/material/styles';
+
 import { createCustomTheme, ThemeName, themeNames } from './theme';
 
 interface ThemeContextType {

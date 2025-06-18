@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Container } from '@mui/material';
+import { Container } from '@mui/material';
 import Header from '@/components/Header';
 import Timer from '@/components/Timer';
 import TimerControls from '@/components/TimerControls';

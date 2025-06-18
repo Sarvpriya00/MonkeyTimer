@@ -55,7 +55,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }, [initialSettings]);
 
   const handleChange = (field: keyof TimerSettings) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | number
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | number
   ) => {
     const value = typeof event === 'number' ? event : event.target.value;
     const parsedValue = typeof value === 'string' && !isNaN(Number(value)) 
@@ -280,7 +280,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                   <select
                     value={settings.sound}
-                    onChange={(e) => handleChange('sound')(e as any)}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('sound')(e)}
                     style={{
                       padding: '8px 12px',
                       borderRadius: '4px',
